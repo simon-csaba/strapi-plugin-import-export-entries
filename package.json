@@ -14,7 +14,8 @@
     "admin/",
     "doc/",
     "libs/",
-    "server/"
+    "server/",
+    "src/"
   ],
   "scripts": {
     "build": "tsc --build",
