@@ -4,31 +4,29 @@ import { Export, ExportOptions } from './export-v2';
 import { SchemaUID } from '../../types';
 const { getConfig } = require('../../utils/getConfig');
 
-type Converter = (jsoContent: Export, options: ExportOptions) => string;
-
 export default {
   convertToJson: withBeforeConvert(convertToJson),
 };
 
-function convertToJson(jsoContent: Export) {
+function convertToJson(jsoContent) {
   return JSON.stringify(jsoContent, null, '\t');
 }
 
-function withBeforeConvert(convertFn: Converter) {
-  return (jsoContent: Export, options: ExportOptions) => {
+function withBeforeConvert(convertFn) {
+  return (jsoContent, options) => {
     return convertFn(beforeConvert(jsoContent, options), options);
   };
 }
 
-function beforeConvert(jsoContent: Export, options: ExportOptions) {
+function beforeConvert(jsoContent, options) {
   jsoContent = buildMediaUrl(jsoContent, options);
   jsoContent = pickMediaAttributes(jsoContent, options);
 
   return jsoContent;
 }
 
-function buildMediaUrl(jsoContent: Export, options: ExportOptions) {
-  let mediaSlug: SchemaUID = CustomSlugToSlug[CustomSlugs.MEDIA];
+function buildMediaUrl(jsoContent, options) {
+  let mediaSlug = CustomSlugToSlug[CustomSlugs.MEDIA];
   let media = jsoContent.data[mediaSlug];
 
   if (!media) {
@@ -36,7 +34,7 @@ function buildMediaUrl(jsoContent: Export, options: ExportOptions) {
   }
 
   media = fromPairs(
-    toPairs(media).map(([id, medium]: [string, any]) => {
+    toPairs(media).map(([id, medium]) => {
       if (isRelativeUrl(medium.url)) {
         medium.url = buildAbsoluteUrl(medium.url);
       }
@@ -49,16 +47,16 @@ function buildMediaUrl(jsoContent: Export, options: ExportOptions) {
   return jsoContent;
 }
 
-function isRelativeUrl(url: string) {
+function isRelativeUrl(url) {
   return url.startsWith('/');
 }
 
-function buildAbsoluteUrl(relativeUrl: string) {
+function buildAbsoluteUrl(relativeUrl) {
   return getConfig('serverPublicHostname') + relativeUrl;
 }
 
-function pickMediaAttributes(jsoContent: Export, options: ExportOptions) {
-  let mediaSlug: SchemaUID = CustomSlugToSlug[CustomSlugs.MEDIA];
+function pickMediaAttributes(jsoContent, options) {
+  let mediaSlug = CustomSlugToSlug[CustomSlugs.MEDIA];
   let media = jsoContent.data[mediaSlug];
 
   if (!media) {
@@ -66,7 +64,7 @@ function pickMediaAttributes(jsoContent: Export, options: ExportOptions) {
   }
 
   media = fromPairs(
-    toPairs(media).map(([id, medium]: [string, any]) => {
+    toPairs(media).map(([id, medium]) => {
       medium = pick(medium, ['id', 'name', 'alternativeText', 'caption', 'hash', 'ext', 'mime', 'url', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy']);
       return [id, medium];
     }),

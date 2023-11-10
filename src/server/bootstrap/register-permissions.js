@@ -16,5 +16,9 @@ async function registerPermissionActions() {
     },
   ];
 
-  await (strapi as any).admin.services.permission.actionProvider.registerMany(actions);
+  await (strapi).admin.services.permission.actionProvider.registerMany(actions);
+}
+
+module.exports = async () => {
+  registerPermissionActions
 }

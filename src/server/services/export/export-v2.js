@@ -35,27 +35,13 @@ import converters from './converters-v2';
 
 const dataFormats = {
   JSON: 'json',
-} as const;
+}
 
 const dataConverterConfigs = {
   [dataFormats.JSON]: {
     convertEntries: converters.convertToJson,
   },
 };
-
-export type Export = {
-  version: 2;
-  data: ExportData;
-};
-type ExportData = ExportDataStore;
-type ExportDataStore = {
-  [slug in SchemaUID]?: {
-    [key: string]: {
-      [attribute: string]: string | number | string[] | number[] | null;
-    };
-  };
-};
-export type ExportOptions = { dataFormat: EnumValues<typeof dataFormats> };
 
 module.exports = {
   exportDataV2,
@@ -70,22 +56,16 @@ async function exportDataV2({
   applySearch,
   deepness = 5,
   exportPluginsContentTypes,
-}: {
-  slug: SchemaUID;
-  search: string;
-  applySearch: boolean;
-  deepness: number;
-  exportPluginsContentTypes: boolean;
-}): Promise<string> {
-  const slugsToExport: SchemaUID[] =
+}){
+  const slugsToExport =
     slug === CustomSlugs.WHOLE_DB ? getAllSlugs({ includePluginsContentTypes: exportPluginsContentTypes }) : toArray(CustomSlugToSlug[slug] || slug);
 
-  let store: ExportDataStore = {};
+  let store = {};
   for (const slug of slugsToExport) {
     const hierarchy = buildSlugHierarchy(slug, deepness);
     store = await findEntriesForHierarchy(store, slug, hierarchy, deepness, { ...(applySearch ? { search } : {}) });
   }
-  const jsoContent: Export = {
+  const jsoContent = {
     version: 2,
     data: store,
   };
@@ -96,12 +76,12 @@ async function exportDataV2({
 }
 
 async function findEntriesForHierarchy(
-  store: ExportDataStore,
-  slug: SchemaUID,
-  hierarchy: Hierarchy,
-  deepness: number,
-  { search, ids }: { search?: string; ids?: EntryId[] },
-): Promise<ExportDataStore> {
+  store,
+  slug,
+  hierarchy,
+  deepness,
+  { search, ids },
+) {
   const schema = getModel(slug);
 
   if (schema.uid === 'admin::user') {
@@ -109,7 +89,7 @@ async function findEntriesForHierarchy(
   }
 
   let entries = await findEntries(slug, deepness, { search, ids })
-    .then((entries: Entry[]) => {
+    .then((entries) => {
       entries = toArray(entries).filter(Boolean);
 
       // Export locales
@@ -120,7 +100,7 @@ async function findEntriesForHierarchy(
         for (const entry of entries) {
           (entry.localizations || []).forEach((localization) => {
             if (localization.id && !entryIdsToExported[localization.id]) {
-              allEntries.push(localization as any);
+              allEntries.push(localization );
               entryIdsToExported[localization.id] = true;
             }
           });
@@ -134,9 +114,9 @@ async function findEntriesForHierarchy(
     .then((entries) => toArray(entries));
 
   // Transform relations as ids.
-  let entriesFlatten: Entry[] = cloneDeep(entries);
+  let entriesFlatten = cloneDeep(entries);
   (() => {
-    const flattenEntryCommon = (entry: Exclude<Entry, DynamicZoneEntry> | Exclude<Entry, DynamicZoneEntry>[]) => {
+    const flattenEntryCommon = (entry) => {
       if (entry == null) {
         return null;
       } else if (isArraySafe(entry)) {
@@ -152,13 +132,13 @@ async function findEntriesForHierarchy(
       return entry;
     };
 
-    const flattenProperty = (propAttribute: Attribute, propEntries: Entry | Entry[]) => {
+    const flattenProperty = (propAttribute, propEntries) => {
       if (propEntries == null) {
         return null;
       } else if (isComponentAttribute(propAttribute)) {
         return flattenEntryCommon(propEntries);
       } else if (isDynamicZoneAttribute(propAttribute)) {
-        return (propEntries as DynamicZoneEntry[]).map((entry) => ({
+        return (propEntries).map((entry) => ({
           __component: entry.__component,
           id: entry.id,
         }));
@@ -170,8 +150,8 @@ async function findEntriesForHierarchy(
       return propEntries;
     };
 
-    const flattenEntry = (entry: Entry, slug: SchemaUID) => {
-      const attributes: Attribute[] = getModelAttributes(slug, { filterType: ['component', 'dynamiczone', 'media', 'relation'] }) as Attribute[];
+    const flattenEntry = (entry, slug) => {
+      const attributes = getModelAttributes(slug, { filterType: ['component', 'dynamiczone', 'media', 'relation'] });
 
       for (const attribute of attributes) {
         setEntryProp(entry, attribute.name, flattenProperty(attribute, getEntryProp(entry, attribute.name)));
@@ -187,8 +167,8 @@ async function findEntriesForHierarchy(
 
   // Skip admin::user slug.
   const filterOutUnwantedRelations = () => {
-    const UNWANTED_RELATIONS: SchemaUID[] = ['admin::user'];
-    const attributes: RelationAttribute[] = getModelAttributes(slug, { filterType: ['relation'] }) as RelationAttribute[];
+    const UNWANTED_RELATIONS = ['admin::user'];
+    const attributes = getModelAttributes(slug, { filterType: ['relation'] }) ;
 
     return entries.map((entry) => {
       attributes.forEach((attribute) => {
@@ -202,16 +182,16 @@ async function findEntriesForHierarchy(
   filterOutUnwantedRelations();
 
   const findAndFlattenComponentAttributes = async () => {
-    let attributes: ComponentAttribute[] = getModelAttributes(slug, { filterType: ['component'] }) as ComponentAttribute[];
+    let attributes = getModelAttributes(slug, { filterType: ['component'] }) ;
     for (const attribute of attributes) {
-      const attributeSlug: SchemaUID | undefined = hierarchy[attribute.name]?.__slug;
+      const attributeSlug = hierarchy[attribute.name]?.__slug;
       if (!attributeSlug) {
         continue;
       }
 
-      const ids: EntryId[] = entries
+      const ids = entries
         .filter((entry) => !!getEntryProp(entry, attribute.name))
-        .flatMap((entry) => getEntryProp(entry, attribute.name) as ComponentEntry | ComponentEntry[])
+        .flatMap((entry) => getEntryProp(entry, attribute.name))
         .filter((entry) => !!entry.id)
         .map((entry) => entry.id)
         .filter((id) => typeof store?.[attributeSlug]?.[`${id}`] === 'undefined');
@@ -223,11 +203,11 @@ async function findEntriesForHierarchy(
   await findAndFlattenComponentAttributes();
 
   const findAndFlattenDynamicZoneAttributes = async () => {
-    let attributes: DynamicZoneAttribute[] = getModelAttributes(slug, { filterType: ['dynamiczone'] }) as DynamicZoneAttribute[];
+    let attributes = getModelAttributes(slug, { filterType: ['dynamiczone'] }) ;
     for (const attribute of attributes) {
       for (const slugFromAttribute of attribute.components) {
         const componentHierarchy = hierarchy[attribute.name]?.[slugFromAttribute];
-        const componentSlug: SchemaUID | undefined = componentHierarchy?.__slug;
+        const componentSlug = componentHierarchy?.__slug;
         if (!componentSlug) {
           continue;
         }
@@ -235,7 +215,7 @@ async function findEntriesForHierarchy(
         const ids = entries
           .filter((entry) => !!getEntryProp(entry, attribute.name))
           .flatMap((entry) => getEntryProp(entry, attribute.name))
-          .filter((entry: DynamicZoneEntry) => entry?.__component === slugFromAttribute)
+          .filter((entry) => entry?.__component === slugFromAttribute)
           .map((entry) => entry.id)
           .filter((id) => typeof store?.[componentSlug]?.[`${id}`] === 'undefined');
 
@@ -247,9 +227,9 @@ async function findEntriesForHierarchy(
   await findAndFlattenDynamicZoneAttributes();
 
   const findAndFlattenMediaAttributes = async () => {
-    let attributes: MediaAttribute[] = getModelAttributes(slug, { filterType: ['media'] }) as MediaAttribute[];
+    let attributes = getModelAttributes(slug, { filterType: ['media'] });
     for (const attribute of attributes) {
-      const attributeSlug: SchemaUID | undefined = hierarchy[attribute.name]?.__slug;
+      const attributeSlug = hierarchy[attribute.name]?.__slug;
       if (!attributeSlug) {
         continue;
       }
@@ -268,9 +248,9 @@ async function findEntriesForHierarchy(
   await findAndFlattenMediaAttributes();
 
   const findAndFlattenRelationAttributes = async () => {
-    let attributes: RelationAttribute[] = getModelAttributes(slug, { filterType: ['relation'] }) as RelationAttribute[];
+    let attributes = getModelAttributes(slug, { filterType: ['relation'] }) ;
     for (const attribute of attributes) {
-      const attributeSlug: SchemaUID | undefined = hierarchy[attribute.name]?.__slug;
+      const attributeSlug = hierarchy[attribute.name]?.__slug;
       if (!attributeSlug) {
         continue;
       }
@@ -291,7 +271,7 @@ async function findEntriesForHierarchy(
   return store;
 }
 
-async function findEntries(slug: string, deepness: number, { search, ids }: { search?: string; ids?: EntryId[] }) {
+async function findEntries(slug, deepness, { search, ids }) {
   try {
     const queryBuilder = new ObjectBuilder();
     queryBuilder.extend(getPopulateFromSchema(slug, deepness));
@@ -317,8 +297,8 @@ function buildFilterQuery(search = '') {
   let { filters, sort: sortRaw } = qs.parse(search);
 
   // TODO: improve query parsing
-  const [attr, value] = (sortRaw as string)?.split(':') || [];
-  const sort: Record<string, string> = {};
+  const [attr, value] = (sortRaw)?.split(':') || [];
+  const sort = {};
   if (attr && value) {
     sort[attr] = value.toLowerCase();
   }
@@ -329,7 +309,7 @@ function buildFilterQuery(search = '') {
   };
 }
 
-function convertData(exportContent: Export, options: { dataFormat: EnumValues<typeof dataFormats> }) {
+function convertData(exportContent, options) {
   const converter = getConverter(options.dataFormat);
 
   const convertedData = converter.convertEntries(exportContent, options);
@@ -337,7 +317,7 @@ function convertData(exportContent: Export, options: { dataFormat: EnumValues<ty
   return convertedData;
 }
 
-function getConverter(dataFormat: EnumValues<typeof dataFormats>) {
+function getConverter(dataFormat) {
   const converter = dataConverterConfigs[dataFormat];
 
   if (!converter) {
@@ -347,9 +327,8 @@ function getConverter(dataFormat: EnumValues<typeof dataFormats>) {
   return converter;
 }
 
-type Populate = { populate: Record<string, Populate | true | undefined> };
 
-function getPopulateFromSchema(slug: string, deepness = 5): Populate | true | undefined {
+function getPopulateFromSchema(slug, deepness = 5) {
   if (deepness <= 1) {
     return true;
   }
@@ -358,7 +337,7 @@ function getPopulateFromSchema(slug: string, deepness = 5): Populate | true | un
     return undefined;
   }
 
-  const populate: Record<string, any> = {};
+  const populate = {};
   const model = strapi.getModel(slug);
   for (const [attributeName, attribute] of Object.entries(getModelPopulationAttributes(model))) {
     if (!attribute) {
@@ -387,24 +366,23 @@ function getPopulateFromSchema(slug: string, deepness = 5): Populate | true | un
 }
 
 // TODO: type hierarchy
-type Hierarchy = any;
 // type Hierarchy = {
 //   [key: string]: Hierarchy | string;
 // };
 
-function buildSlugHierarchy(slug: SchemaUID, deepness = 5): Hierarchy {
+function buildSlugHierarchy(slug, deepness = 5) {
   slug = CustomSlugToSlug[slug] || slug;
 
   if (deepness <= 1) {
     return { __slug: slug };
   }
 
-  const hierarchy: Hierarchy = {
+  const hierarchy = {
     __slug: slug,
   };
 
   const model = getModel(slug);
-  for (const [attributeName, attribute] of Object.entries(getModelPopulationAttributes(model)) as [string, Attribute][]) {
+  for (const [attributeName, attribute] of Object.entries(getModelPopulationAttributes(model)) ) {
     if (!attribute) {
       continue;
     }
@@ -420,14 +398,14 @@ function buildSlugHierarchy(slug: SchemaUID, deepness = 5): Hierarchy {
       }
     } else if (isMediaAttribute(attribute)) {
       // TODO: remove casting
-      hierarchy[attributeName] = buildSlugHierarchy(CustomSlugs.MEDIA as SchemaUID, deepness - 1);
+      hierarchy[attributeName] = buildSlugHierarchy(CustomSlugs.MEDIA , deepness - 1);
     }
   }
 
   return hierarchy;
 }
 
-function getModelPopulationAttributes(model: Schema) {
+function getModelPopulationAttributes(model) {
   if (model.uid === 'plugin::upload.file') {
     const { related, ...attributes } = model.attributes;
     return attributes;
